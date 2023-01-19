@@ -1,0 +1,122 @@
+---
+title: "Beispiel Tabellierung mit Quarto"
+subtitle: "Einwohner in Berlin nach Alter und Geschlecht, 2021"
+author: "Ulrike Niemann"
+date: 2023-01-19
+date-format: "MMMM YYYY"
+lang: de
+format:
+  html:
+    include-in-header:
+        - header.html
+    theme: default
+    toc: true
+    toc-location: left
+    number-sections: true
+    embed-resources: true  
+    output-file: "index.html"
+execute:
+  echo: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+#| warning: false
+# Load packages ----------------------------------------------------------------
+if (!require("tidyverse")) install.packages("tidyverse"); library(tidyverse)
+if (!require("knitr")) install.packages("knitr"); library(knitr)
+if (!require("janitor")) install.packages("janitor"); library(janitor)
+if (!require("formattable")) install.packages("formattable"); library(formattable)
+options(dplyr.summarise.inform = FALSE)
+# data -------------------------------------------------------------------------
+load(file = "data.RData")
+# functions --------------------------------------------------------------------
+# Kreuztabelle aufbauen mit Gesamtspalte + Gesamtzeile, ggf. als Prozent
+crossTab = function(df, var, perc = FALSE) {
+  tab <- df %>%
+    group_by(Geschlecht, {{var}}) %>% 
+    summarise(n = sum(Anzahl)) %>%
+    spread(Geschlecht, n) %>%  
+    adorn_totals("row", name = "Gesamt") %>%
+    adorn_totals("col", name = "Gesamt")
+  if (perc == TRUE) {
+    tab <- tab %>% 
+      adorn_percentages("col") %>% 
+      mutate_at(vars(-1), ~ percent(. ,digits = 1))
+  }
+  return(tab)
+}
+# knitr-Output + Formatierungen
+outKnitr = function(tab) { 
+    tab %>% 
+      kable() %>% 
+      kable_styling(fixed_thead = TRUE,
+                    bootstrap_options = c("striped", "hover", "responsive")) %>% 
+      row_spec(nrow(tab), bold = TRUE) %>% 
+      column_spec(length(tab), bold = TRUE)
+}
+```
+<!-- css ------------------------------------------------------------------- -->
+```{css, echo = FALSE}
+.table {
+  font-size: 0.8em;
+}
+```
+<!-- ----------------------------------------------------------------------- -->
+
+
+Datenquelle: Tabelle 12411-0013, <https://www-genesis.destatis.de/genesis/online>
+
+## Alter im Überblick
+
+
+### Durchschnittliches Alter
+
+Als ganz "einfache" Tabelle nur mit kable()
+
+```{r}
+dat %>%
+  group_by(Geschlecht) %>% 
+  summarise(`Alter Mittelwert` = sum(AlterJahr * Anzahl) / sum(Anzahl)) %>% 
+  kable()
+```
+
+### Altersgruppen Anzahl
+
+Ab hier mit kableExtra 
+
+```{r}
+#| warning: false
+if (!require("kableExtra")) install.packages("kableExtra"); library(kableExtra)
+#options(knitr.kable.NA = '-')
+df <- dat %>% filter(Geschlecht != "Insgesamt")
+crossTab(df, Altersgruppe) %>% outKnitr()
+```
+
+### Altersgruppen Prozent
+
+```{r}
+crossTab(df, Altersgruppe, perc = TRUE) %>% outKnitr()
+```
+
+
+<!-- ----------------------------------------------------------------------- -->
+## Detaillierte Altersjahre
+
+### Altersjahre
+
+```{r}
+crossTab(df, Alter) %>%
+  outKnitr()
+```
+
+### Altersjahre als Prozent
+
+```{r}
+crossTab(df, Alter, perc = TRUE) %>%
+  outKnitr()
+```
+
+
+
